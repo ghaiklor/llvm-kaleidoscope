@@ -21,6 +21,25 @@ static std::string IdentifierStr;
 // NumVal holds its value
 static double NumVal;
 
+// Provide a simple token buffer
+// CurTok is the current token the parser is looking at
+// getNextToken reads another token from the lexer and updates CurTok with its results
+static int CurTok;
+static int getNextToken() {
+  return CurTok = gettok();
+}
+
+// Some helpers for error handling
+std::unique_ptr<ExprAST> LogError(const char *Str) {
+  fprintf(stderr, "LogError: %s\n", Str);
+  return nullptr;
+}
+
+std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
+  LogError(Str);
+  return nullptr;
+}
+
 // The actual implementation of the lexer is a single function gettok()
 // It's called to return the next token from standard input
 // gettok works by calling getchar() function to read chars one at a time
@@ -151,3 +170,78 @@ class FunctionAST {
 public:
   FunctionAST(std::unique_ptr<PrototypeAST> Proto, std::unique_ptr<ExprAST> Body) : Proto(std::move(Proto)), Body(std::move(Body)) {}
 };
+
+// This routine expects to be called when the current token is a tok_number
+// It takes the current number value and creates a NumberExprAST node
+static std::unique_ptr<ExprAST> ParseNumberExpr() {
+  auto Result = llvm::make_unique<NumberExprAST>(NumVal);
+  getNextToken();
+  return std::move(Result);
+}
+
+// This routine parses expressions in "(" and ")" characters
+static std::unique_ptr<ExprAST> ParseParenExpr() {
+  getNextToken();
+
+  auto V = ParseExpression();
+  if (!V) {
+    return nullptr;
+  }
+
+  if (CurTok != ')') {
+    return LogError("expected )");
+  }
+
+  getNextToken();
+  return V;
+}
+
+// This routine expects to be called when current token is tok_identifier
+static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
+  std::string IdName = IdentifierStr;
+
+  getNextToken();
+
+  if (CurTok != '(') {
+    return llvm::make_unique<VariableExprAST>(IdName);
+  }
+
+  getNextToken();
+  std::vector<std::unique_ptr<ExprAST>> Args;
+  if (CurTok != ')') {
+    while (1) {
+      if (auto Arg = ParseExpression()) {
+        Args.push_back(std::move(Arg));
+      } else {
+        return nullptr;
+      }
+
+      if (CurTok == ')') {
+        break;
+      }
+
+      if (CurTok != ',') {
+        return LogError("Expected ')' or ',' in argument list");
+      }
+
+      getNextToken();
+    }
+  }
+
+  getNextToken();
+
+  return llvm::make_unique<CallExprAST>(IdName, std::move(Args));
+}
+
+static std::unique_ptr<ExprAST> ParsePrimary() {
+  switch (CurTok) {
+    default:
+      return LogError("Unknown token when expecting an expression");
+    case tok_identifier:
+      return ParseIdentifierExpr();
+    case tok_number:
+      return ParseNumberExpr();
+    case '(':
+      return ParseParenExpr();
+  }
+}
