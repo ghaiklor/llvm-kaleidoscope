@@ -31,25 +31,6 @@ static std::string IdentifierStr;
 // NumVal holds its value
 static double NumVal;
 
-// Provide a simple token buffer
-// CurTok is the current token the parser is looking at
-// getNextToken reads another token from the lexer and updates CurTok with its results
-static int CurTok;
-static int getNextToken() {
-  return CurTok = gettok();
-}
-
-// Some helpers for error handling
-std::unique_ptr<ExprAST> LogError(const char *Str) {
-  fprintf(stderr, "LogError: %s\n", Str);
-  return nullptr;
-}
-
-std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
-  LogError(Str);
-  return nullptr;
-}
-
 // The actual implementation of the lexer is a single function gettok()
 // It's called to return the next token from standard input
 // gettok works by calling getchar() function to read chars one at a time
@@ -121,65 +102,100 @@ static int gettok() {
 }
 
 // Base class for all expression nodes
-class ExprAST {
-public:
-  virtual ~ExprAST() {}
-};
+namespace {
+  class ExprAST {
+  public:
+    virtual ~ExprAST() {}
+  };
 
-// Expression class for numeric literals like "1.0"
-class NumberExprAST : public ExprAST {
-  double Val;
+  // Expression class for numeric literals like "1.0"
+  class NumberExprAST : public ExprAST {
+    double Val;
 
-public:
-  NumberExprAST(double Val) : Val(Val) {}
-};
+  public:
+    NumberExprAST(double Val) : Val(Val) {}
+  };
 
-// Expression class for referencing a variable, like "a"
-class VariableExprAST : public ExprAST {
-  std::string Name;
+  // Expression class for referencing a variable, like "a"
+  class VariableExprAST : public ExprAST {
+    std::string Name;
 
-public:
-  VariableExprAST(const std::string &Name) : Name(Name) {}
-};
+  public:
+    VariableExprAST(const std::string &Name) : Name(Name) {}
+  };
 
-// Expression class for a binary operator
-class BinaryExprAST : public ExprAST {
-  char Op;
-  std::unique_ptr<ExprAST> LHS, RHS;
+  // Expression class for a binary operator
+  class BinaryExprAST : public ExprAST {
+    char Op;
+    std::unique_ptr<ExprAST> LHS, RHS;
 
-public:
-  BinaryExprAST(char op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS) : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+  public:
+    BinaryExprAST(char op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS) : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
+  };
+
+  // Expression class for function calls
+  class CallExprAST : public ExprAST {
+    std::string Callee;
+    std::vector<std::unique_ptr<ExprAST>> Args;
+
+  public:
+    CallExprAST(const std::string &Callee, std::vector<std::unique_ptr<ExprAST>> Args) : Callee(Callee), Args(std::move(Args)) {}
+  };
+
+  // Represents the "prototype" for a function,
+  // which captures its name, and its argument names
+  class PrototypeAST {
+    std::string Name;
+    std::vector<std::string> Args;
+
+  public:
+    PrototypeAST(const std::string &name, std::vector<std::string> Args) : Name(name), Args(std::move(Args)) {}
+
+    const std::string &getName() const { return Name; }
+  };
+
+  // Represents a function definition itself
+  class FunctionAST {
+    std::unique_ptr<PrototypeAST> Proto;
+    std::unique_ptr<ExprAST> Body;
+
+  public:
+    FunctionAST(std::unique_ptr<PrototypeAST> Proto, std::unique_ptr<ExprAST> Body) : Proto(std::move(Proto)), Body(std::move(Body)) {}
+  };
 }
 
-// Expression class for function calls
-class CallExprAST : public ExprAST {
-  std::string Callee;
-  std::vector<std::unique_ptr<ExprAST>> Args;
-
-public:
-  CallExprAST(const std::string &Callee, std::vector<std::unique_ptr<ExprAST>> Args) : Callee(Callee), Args(std::move(Args)) {}
+// Provide a simple token buffer
+// CurTok is the current token the parser is looking at
+// getNextToken reads another token from the lexer and updates CurTok with its results
+static int CurTok;
+static int getNextToken() {
+  return CurTok = gettok();
 }
 
-// Represents the "prototype" for a function,
-// which captures its name, and its argument names
-class PrototypeAST {
-  std::string Name;
-  std::vector<std::string> Args;
+static std::map<char, int> BinopPrecedence;
+static int GetTokPrecedence() {
+  if (!isascii(CurTok)) {
+    return -1;
+  }
 
-public:
-  PrototypeAST(const std::string &name, std::vector<std::string> Args) : Name(name), Args(std::move(Args)) {}
+  int TokPrec = BinopPrecedence[CurTok];
+  if (TokPrec <= 0) return -1;
 
-  const std::string &getName() const { return Name; }
-};
+  return TokPrec;
+}
 
-// Represents a function definition itself
-class FunctionAST {
-  std::unique_ptr<PrototypeAST> Proto;
-  std::unique_ptr<ExprAST> Body;
+// Some helpers for error handling
+std::unique_ptr<ExprAST> LogError(const char *Str) {
+  fprintf(stderr, "LogError: %s\n", Str);
+  return nullptr;
+}
 
-public:
-  FunctionAST(std::unique_ptr<PrototypeAST> Proto, std::unique_ptr<ExprAST> Body) : Proto(std::move(Proto)), Body(std::move(Body)) {}
-};
+std::unique_ptr<PrototypeAST> LogErrorP(const char *Str) {
+  LogError(Str);
+  return nullptr;
+}
+
+static std::unique_ptr<ExprAST> ParseExpression();
 
 // This routine expects to be called when the current token is a tok_number
 // It takes the current number value and creates a NumberExprAST node
@@ -243,7 +259,46 @@ static std::unique_ptr<ExprAST> ParseIdentifierExpr() {
   return llvm::make_unique<CallExprAST>(IdName, std::move(Args));
 }
 
-static std::unique_ptr<ExprAST> ParseExpression();
+static std::unique_ptr<ExprAST> ParsePrimary() {
+  switch (CurTok) {
+    default:
+    return LogError("Unknown token when expecting an expression");
+    case tok_identifier:
+    return ParseIdentifierExpr();
+    case tok_number:
+    return ParseNumberExpr();
+    case '(':
+    return ParseParenExpr();
+  }
+}
+
+static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec, std::unique_ptr<ExprAST> LHS) {
+  while (true) {
+    int TokPrec = GetTokPrecedence();
+
+    if (TokPrec < ExprPrec) {
+      return LHS;
+    }
+
+    int BinOp = CurTok;
+    getNextToken();
+
+    auto RHS = ParsePrimary();
+    if (!RHS) {
+      return nullptr;
+    }
+
+    int NextPrec = GetTokPrecedence();
+    if (TokPrec < NextPrec) {
+      RHS = ParseBinOpRHS(TokPrec + 1, std::move(RHS));
+      if (!RHS) {
+        return nullptr;
+      }
+    }
+
+    LHS = llvm::make_unique<BinaryExprAST>(BinOp, std::move(LHS), std::move(RHS));
+  }
+}
 
 static std::unique_ptr<ExprAST> ParseExpression() {
   auto LHS = ParsePrimary();
@@ -290,7 +345,7 @@ static std::unique_ptr<FunctionAST> ParseDefinition() {
   }
 
   if (auto E = ParseExpression()) {
-    return llvm:make_unique<FunctionAST>(std::move(Proto), std::move(E));
+    return llvm::make_unique<FunctionAST>(std::move(Proto), std::move(E));
   }
 
   return nullptr;
@@ -310,58 +365,6 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
   return ParsePrototype();
 }
 
-static std::map<char, int> BinopPrecedence;
-static int GetTokPrecedence() {
-  if (!isascii(CurTok)) {
-    return -1;
-  }
-
-  int TokPrec = BinopPrecedence[CurTok];
-  if (TokPrec <= 0) return -1;
-
-  return TokPrec;
-}
-
-static std::unique_ptr<ExprAST> ParseBinOpRHS(int ExprPrec, std::unique_ptr<ExprAST> LHS) {
-  while (true) {
-    int TokPrec = GetTokPrecedence();
-
-    if (TokPrec < ExprPrec) {
-      return LHS;
-    }
-
-    int BinOp = CurTok;
-    getNextToken();
-
-    auto RHS = ParsePrimary();
-    if (!RHS) {
-      return nullptr;
-    }
-
-    int NextPrec = GetTokPrecedence();
-    if (TokPrec < NextPrec) {
-      RHS = ParseBinOpRHS(TokPrec + 1, std::move(RHS));
-      if (!RHS) {
-        return nullptr;
-      }
-    }
-
-    LHS = llvm::make_unique<BinaryExprAST>(BinOp, std::move(LHS), std::move(RHS));
-  }
-}
-
-static std::unique_ptr<ExprAST> ParsePrimary() {
-  switch (CurTok) {
-    default:
-      return LogError("Unknown token when expecting an expression");
-    case tok_identifier:
-      return ParseIdentifierExpr();
-    case tok_number:
-      return ParseNumberExpr();
-    case '(':
-      return ParseParenExpr();
-  }
-}
 
 static void HandleDefinition() {
   if (ParseDefinition()) {
@@ -393,19 +396,19 @@ static void MainLoop() {
 
     switch (CurTok) {
       case tok_eof:
-        return;
+      return;
       case ';':
-        getNextToken();
-        break;
+      getNextToken();
+      break;
       case tok_def:
-        HandleDefinition();
-        break;
+      HandleDefinition();
+      break;
       case tok_extern:
-        HandleExtern();
-        break;
+      HandleExtern();
+      break;
       default:
-        HandleTopLevelExpression();
-        break;
+      HandleTopLevelExpression();
+      break;
     }
   }
 }
