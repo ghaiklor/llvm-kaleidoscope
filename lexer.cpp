@@ -6,19 +6,11 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/Target/TargetMachine.h"
-#include "llvm/Transforms/Scalar.h"
-#include "llvm/Transforms/Scalar/GVN.h"
-#include "llvm/examples/Kaleidoscope/include/KaleidoscopeJIT.h"
 #include <algorithm>
-#include <cassert>
 #include <cctype>
-#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <map>
@@ -27,7 +19,6 @@
 #include <vector>
 
 using namespace llvm;
-using namespace llvm::orc;
 
 // The lexer returns tokens [0-255] if it's an unknown character
 // otherwise it returns one of these for known things
@@ -211,6 +202,18 @@ static int GetTokPrecedence() {
 
   return TokPrec;
 }
+
+// This is an object that owns LLVM core data structures
+static LLVMContext TheContext;
+
+// This is a helper object that makes easy to generate LLVM instructions
+static IRBuilder<> Builder(TheContext);
+
+// This is an LLVM construct that contains functions and global variables
+static std::unique_ptr<Module> TheModule;
+
+// This map keeps track of which values are defined in the current scope
+static std::map<std::string, Value *> NamedValues;
 
 // Some helpers for error handling
 std::unique_ptr<ExprAST> LogError(const char *Str) {
@@ -398,35 +401,6 @@ static std::unique_ptr<PrototypeAST> ParseExtern() {
   return ParsePrototype();
 }
 
-// This is an object that owns LLVM core data structures
-static LLVMContext TheContext;
-
-// This is a helper object that makes easy to generate LLVM instructions
-static IRBuilder<> Builder(TheContext);
-
-// This is an LLVM construct that contains functions and global variables
-static std::unique_ptr<Module> TheModule;
-
-// This map keeps track of which values are defined in the current scope
-static std::map<std::string, Value *> NamedValues;
-
-static std::unique_ptr<legacy::FunctionPassManager> TheFPM;
-static std::unique_ptr<KaleidoscopeJIT> TheJIT;
-static std::map<std::string, std::unique_ptr<PrototypeAST>> FunctionProtos;
-
-Function *getFunction(std::string Name) {
-  if (auto *F = TheModule->getFunction(Name)) {
-    return F;
-  }
-
-  auto FI = FunctionProtos.find(Name);
-  if (FI != FunctionProtos.end()) {
-    return FI->second->codegen();
-  }
-
-  return nullptr;
-}
-
 // Generate LLVM code for numeric literals
 Value *NumberExprAST::codegen() {
   return ConstantFP::get(TheContext, APFloat(Val));
@@ -469,7 +443,7 @@ Value *BinaryExprAST::codegen() {
 
 // Generate LLVM code for function calls
 Value *CallExprAST::codegen() {
-  Function *CalleeF = getFunction(Callee);
+  Function *CalleeF = TheModule->getFunction(Callee);
 
   if (!CalleeF) {
     return LogErrorV("Unknown function referenced");
@@ -507,9 +481,11 @@ Function *PrototypeAST::codegen() {
 
 // Generates LLVM code for functions declarations
 Function *FunctionAST::codegen() {
-  auto &P = *Proto;
-  FunctionProtos[Proto->getName()] = std::move(Proto);
-  Function *TheFunction = getFunction(P.getName());
+  Function *TheFunction = TheModule->getFunction(Proto->getName());
+
+  if (!TheFunction) {
+    TheFunction = Proto->codegen();
+  }
 
   if (!TheFunction) {
     return nullptr;
@@ -526,25 +502,11 @@ Function *FunctionAST::codegen() {
     Builder.CreateRet(RetVal);
     verifyFunction(*TheFunction);
 
-    TheFPM->run(*TheFunction);
-
     return TheFunction;
   }
 
   TheFunction->eraseFromParent();
   return nullptr;
-}
-
-void InitializeModuleAndPassManager(void) {
-  TheModule = llvm::make_unique<Module>("my cool jit", TheContext);
-  TheModule->setDataLayout(TheJIT->getTargetMachine().createDataLayout());
-
-  TheFPM = llvm::make_unique<FunctionPassManager>(TheModule.get());
-  TheFPM->add(createInstructionCombiningPass());
-  TheFPM->add(createReassociatePass());
-  TheFPM->add(createGVNPass());
-  TheFPM->add(createCFGSimplificationPass());
-  TheFPM->doInitialization();
 }
 
 static void HandleDefinition() {
@@ -553,8 +515,6 @@ static void HandleDefinition() {
       fprintf(stderr, "Read function definition:");
       FnIR->print(errs());
       fprintf(stderr, "\n");
-      TheJIT->addModule(std::move(TheModule));
-      InitializeModuleAndPassManager();
     }
   } else {
     getNextToken();
@@ -567,7 +527,6 @@ static void HandleExtern() {
       fprintf(stderr, "Read extern:");
       FnIR->print(errs());
       fprintf(stderr, "\n");
-      FunctionProtos[ProtoAST->getName()] = std::move(ProtoAST);
     }
   } else {
     getNextToken();
@@ -577,16 +536,9 @@ static void HandleExtern() {
 static void HandleTopLevelExpression() {
   if (auto FnAST = ParseTopLevelExpr()) {
     if (auto *FnIR = FnAST->codegen()) {
-      auto H = TheJIT->addModule(std::move(TheModule));
-      InitializeModuleAndPassManager();
-
-      auto ExprSymbol = TheJIT->findSymbol("__anon_expr");
-      assert(ExprSymbol && "Function not found");
-
-      double (*FP)() = (double (*)())(intptr_t)ExprSymbol.getAddress();
-      fprintf(stderr, "Evaluated to %f\n", FP());
-
-      TheJIT->removeModule(H);
+      fprintf(stderr, "Read top-level expression:");
+      FnIR->print(errs());
+      fprintf(stderr, "\n");
     }
   } else {
     getNextToken();
@@ -616,27 +568,7 @@ static void MainLoop() {
   }
 }
 
-#ifdef LLVM_ON_WIN32
-#define DLLEXPORT __declspec(dllexport)
-#else
-#define DLLEXPORT
-#endif
-
-extern "C" DLLEXPORT double putchard(double X) {
-  fputc((char)X, stderr);
-  return 0;
-}
-
-extern "C" DLLEXPORT double printd(double X) {
-  fprintf(stderr, "%f\n", X);
-  return 0;
-}
-
 int main() {
-  InitializeNativeTarget();
-  InitializeNativeTargetAsmPrinter();
-  InitializeNativeTargetAsmParser();
-
   BinopPrecedence['<'] = 10;
   BinopPrecedence['+'] = 20;
   BinopPrecedence['-'] = 20;
@@ -645,11 +577,11 @@ int main() {
   fprintf(stderr, "ready> ");
   getNextToken();
 
-  TheJIT = llvm::make_unique<KaleidoscopeJIT>();
-
-  InitializeModuleAndPassManager();
+  TheModule = llvm::make_unique<Module>("My awesome JIT", TheContext);
 
   MainLoop();
+
+  TheModule->print(errs(), nullptr);
 
   return 0;
 }
