@@ -1,3 +1,17 @@
+// lexer headers
+#include "./lexer/lexer.h"
+#include "./lexer/token.h"
+
+// AST headers
+#include "./ast/BinaryExprAST.h"
+#include "./ast/CallExprAST.h"
+#include "./ast/ExprAST.h"
+#include "./ast/FunctionAST.h"
+#include "./ast/NumberExprAST.h"
+#include "./ast/PrototypeAST.h"
+#include "./ast/VariableExprAST.h"
+
+// LLVM headers
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/BasicBlock.h"
@@ -9,6 +23,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
+
+// stdlib headers
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -19,177 +35,6 @@
 #include <vector>
 
 using namespace llvm;
-
-// The lexer returns tokens [0-255] if it's an unknown character
-// otherwise it returns one of these for known things
-enum Token {
-  // End Of File
-  tok_eof = -1,
-
-  // Commands
-  tok_def = -2,
-  tok_extern = -3,
-
-  // Primary
-  tok_identifier = -4,
-  tok_number = -5,
-};
-
-// If the current token is an identifier
-// IdentifierStr will hold the name of the identifier
-static std::string IdentifierStr;
-
-// If the current token is a numeric literal
-// NumVal holds its value
-static double NumVal;
-
-// The actual implementation of the lexer is a single function gettok()
-// It's called to return the next token from standard input
-// gettok works by calling getchar() function to read chars one at a time
-// Then it recognizes them and stores the last character read in LastChar
-static int gettok() {
-  static int LastChar = ' ';
-
-  // The first thing we need to do is ignore whitespaces between tokens
-  while (isspace(LastChar)) {
-    LastChar = getchar();
-  }
-
-  // Next thing is recognize identifier and specific keywords like "def"
-  if (isalpha(LastChar)) {
-    IdentifierStr = LastChar;
-
-    // Stacking together all alphanumeric characters into IdentifierStr
-    while (isalnum(LastChar = getchar())) {
-      IdentifierStr += LastChar;
-    }
-
-    if (IdentifierStr == "def") {
-      return tok_def;
-    }
-
-    if (IdentifierStr == "extern") {
-      return tok_extern;
-    }
-
-    return tok_identifier;
-  }
-
-  // Stacking together only numeric values
-  if (isdigit(LastChar) || LastChar == '.') {
-    std::string NumStr;
-
-    do {
-      NumStr += LastChar;
-      LastChar = getchar();
-    } while (isdigit(LastChar) || LastChar == '.');
-
-    // Convert numeric string to numeric value
-    // that we are store in NumVal
-    NumVal = strtod(NumStr.c_str(), 0);
-    return tok_number;
-  }
-
-  // Handling comments by skipping to the end of the line
-  // and return the next token
-  if (LastChar == '#') {
-    do {
-      LastChar = getchar();
-    } while (LastChar != EOF && LastChar != '\n' && LastChar != '\r');
-
-    if (LastChar != EOF) {
-      return gettok();
-    }
-  }
-
-  // Finally, if the input doesn't match one of the above cases
-  // it's either an operator character like '+' or the end of the file
-  if (LastChar == EOF) {
-    return tok_eof;
-  }
-
-  int ThisChar = LastChar;
-  LastChar = getchar();
-  return ThisChar;
-}
-
-// Base class for all expression nodes
-namespace {
-  class ExprAST {
-  public:
-    virtual ~ExprAST() {}
-    virtual Value *codegen() = 0;
-  };
-
-  // Expression class for numeric literals like "1.0"
-  class NumberExprAST : public ExprAST {
-    double Val;
-
-  public:
-    NumberExprAST(double Val) : Val(Val) {}
-    Value *codegen() override;
-  };
-
-  // Expression class for referencing a variable, like "a"
-  class VariableExprAST : public ExprAST {
-    std::string Name;
-
-  public:
-    VariableExprAST(const std::string &Name) : Name(Name) {}
-    Value *codegen() override;
-  };
-
-  // Expression class for a binary operator
-  class BinaryExprAST : public ExprAST {
-    char Op;
-    std::unique_ptr<ExprAST> LHS, RHS;
-
-  public:
-    BinaryExprAST(char op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS) : Op(op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
-    Value *codegen() override;
-  };
-
-  // Expression class for function calls
-  class CallExprAST : public ExprAST {
-    std::string Callee;
-    std::vector<std::unique_ptr<ExprAST>> Args;
-
-  public:
-    CallExprAST(const std::string &Callee, std::vector<std::unique_ptr<ExprAST>> Args) : Callee(Callee), Args(std::move(Args)) {}
-    Value *codegen() override;
-  };
-
-  // Represents the "prototype" for a function,
-  // which captures its name, and its argument names
-  class PrototypeAST {
-    std::string Name;
-    std::vector<std::string> Args;
-
-  public:
-    PrototypeAST(const std::string &name, std::vector<std::string> Args) : Name(name), Args(std::move(Args)) {}
-
-    Function *codegen();
-    const std::string &getName() const { return Name; }
-  };
-
-  // Represents a function definition itself
-  class FunctionAST {
-    std::unique_ptr<PrototypeAST> Proto;
-    std::unique_ptr<ExprAST> Body;
-
-  public:
-    FunctionAST(std::unique_ptr<PrototypeAST> Proto, std::unique_ptr<ExprAST> Body) : Proto(std::move(Proto)), Body(std::move(Body)) {}
-    Function *codegen();
-  };
-}
-
-// Provide a simple token buffer
-// CurTok is the current token the parser is looking at
-// getNextToken reads another token from the lexer and updates CurTok with its results
-static int CurTok;
-static int getNextToken() {
-  return CurTok = gettok();
-}
 
 static std::map<char, int> BinopPrecedence;
 static int GetTokPrecedence() {
@@ -399,114 +244,6 @@ static std::unique_ptr<FunctionAST> ParseTopLevelExpr() {
 static std::unique_ptr<PrototypeAST> ParseExtern() {
   getNextToken();
   return ParsePrototype();
-}
-
-// Generate LLVM code for numeric literals
-Value *NumberExprAST::codegen() {
-  return ConstantFP::get(TheContext, APFloat(Val));
-}
-
-// We assume that the variable has already been emitted somewhere
-Value *VariableExprAST::codegen() {
-  Value *V = NamedValues[Name];
-
-  if (!V) {
-    LogErrorV("Unknown variable name");
-  }
-
-  return V;
-}
-
-// Generate LLVM code for binary expressions
-Value *BinaryExprAST::codegen() {
-  Value *L = LHS->codegen();
-  Value *R = RHS->codegen();
-
-  if (!L || !R) {
-    return nullptr;
-  }
-
-  switch (Op) {
-    case '+':
-      return Builder.CreateFAdd(L, R, "addtmp");
-    case '-':
-      return Builder.CreateFSub(L, R, "subtmp");
-    case '*':
-      return Builder.CreateFMul(L, R, "multmp");
-    case '<':
-      L = Builder.CreateFCmpULT(L, R, "cmptmp");
-      return Builder.CreateUIToFP(L, Type::getDoubleTy(TheContext), "booltmp");
-    default:
-      return LogErrorV("Invalid binary operator");
-  }
-}
-
-// Generate LLVM code for function calls
-Value *CallExprAST::codegen() {
-  Function *CalleeF = TheModule->getFunction(Callee);
-
-  if (!CalleeF) {
-    return LogErrorV("Unknown function referenced");
-  }
-
-  if (CalleeF->arg_size() != Args.size()) {
-    return LogErrorV("Incorrect # arguments passed");
-  }
-
-  std::vector<Value *> ArgsV;
-  for (unsigned i = 0, e = Args.size(); i != e; i++) {
-    ArgsV.push_back(Args[i]->codegen());
-
-    if (!ArgsV.back()) {
-      return nullptr;
-    }
-  }
-
-  return Builder.CreateCall(CalleeF, ArgsV, "calltmp");
-}
-
-// Generates LLVM code for externals calls
-Function *PrototypeAST::codegen() {
-  std::vector<Type *> Doubles(Args.size(), Type::getDoubleTy(TheContext));
-  FunctionType *FT = FunctionType::get(Type::getDoubleTy(TheContext), Doubles, false);
-  Function *F = Function::Create(FT, Function::ExternalLinkage, Name, TheModule.get());
-
-  unsigned Idx = 0;
-  for (auto &Arg : F->args()) {
-    Arg.setName(Args[Idx++]);
-  }
-
-  return F;
-}
-
-// Generates LLVM code for functions declarations
-Function *FunctionAST::codegen() {
-  Function *TheFunction = TheModule->getFunction(Proto->getName());
-
-  if (!TheFunction) {
-    TheFunction = Proto->codegen();
-  }
-
-  if (!TheFunction) {
-    return nullptr;
-  }
-
-  BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
-  Builder.SetInsertPoint(BB);
-  NamedValues.clear();
-  for (auto &Arg : TheFunction->args()) {
-    NamedValues[Arg.getName()] = &Arg;
-  }
-
-  if (Value *RetVal = Body->codegen()) {
-    Builder.CreateRet(RetVal);
-    verifyFunction(*TheFunction);
-
-    return TheFunction;
-  }
-
-  TheFunction->eraseFromParent();
-  return nullptr;
 }
 
 static void HandleDefinition() {
