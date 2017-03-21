@@ -1,7 +1,7 @@
 #ifndef __BINARY_EXPR_AST_H__
 #define __BINARY_EXPR_AST_H__
 
-#include "./ExprAST.h"
+#include "ExprAST.h"
 
 // Expression class for a binary operator
 class BinaryExprAST : public ExprAST {

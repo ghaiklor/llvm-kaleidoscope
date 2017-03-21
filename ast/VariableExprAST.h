@@ -1,7 +1,7 @@
 #ifndef __VARIABLE_EXPR_AST_H__
 #define __VARIABLE_EXPR_AST_H__
 
-#include "./ExprAST.h"
+#include "ExprAST.h"
 
 // Expression class for referencing a variable, like "a"
 class VariableExprAST : public ExprAST {

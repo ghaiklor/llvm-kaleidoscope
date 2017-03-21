@@ -1,5 +1,5 @@
-#include "./lexer.h"
-#include "./token.h"
+#include "lexer.h"
+#include "token.h"
 
 // The actual implementation of the lexer is a single function gettok()
 // It's called to return the next token from standard input

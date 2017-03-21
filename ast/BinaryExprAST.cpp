@@ -1,4 +1,4 @@
-#include "./BinaryExprAST.h"
+#include "BinaryExprAST.h"
 
 // Generate LLVM code for binary expressions
 llvm::Value *BinaryExprAST::codegen() {

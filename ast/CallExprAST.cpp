@@ -1,8 +1,8 @@
-#include "./CallExprAST.h"
+#include "CallExprAST.h"
 
 // Generate LLVM code for function calls
-Value *CallExprAST::codegen() {
-  Function *CalleeF = TheModule->getFunction(Callee);
+llvm::Value *CallExprAST::codegen() {
+  llvm::Function *CalleeF = TheModule->getFunction(Callee);
 
   if (!CalleeF) {
     return LogErrorV("Unknown function referenced");
@@ -12,7 +12,7 @@ Value *CallExprAST::codegen() {
     return LogErrorV("Incorrect # arguments passed");
   }
 
-  std::vector<Value *> ArgsV;
+  std::vector<llvm::Value *> ArgsV;
   for (unsigned i = 0, e = Args.size(); i != e; i++) {
     ArgsV.push_back(Args[i]->codegen());
 

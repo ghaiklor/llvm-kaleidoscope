@@ -1,4 +1,4 @@
-#include "./NumberExprAST.h"
+#include "NumberExprAST.h"
 
 // Generate LLVM code for numeric literals
 llvm::Value *NumberExprAST::codegen() {
