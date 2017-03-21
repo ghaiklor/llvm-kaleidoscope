@@ -1,6 +1,8 @@
 #ifndef __BINARY_EXPR_AST_H__
 #define __BINARY_EXPR_AST_H__
 
+#include "llvm/IR/IRBuilder.h"
+#include "../logger/logger.h"
 #include "ExprAST.h"
 
 // Expression class for a binary operator

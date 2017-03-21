@@ -1,6 +1,12 @@
 #ifndef __PARSER_H__
 #define __PARSER_H__
 
+#include <map>
+#include "../ast/ExprAST.h"
+#include "../ast/PrototypeAST.h"
+#include "../ast/FunctionAST.h"
+
+std::map<char, int> BinopPrecedence;
 std::unique_ptr<ExprAST> ParseNumberExpr();
 std::unique_ptr<ExprAST> ParseParenExpr();
 std::unique_ptr<ExprAST> ParseIdentifierExpr();

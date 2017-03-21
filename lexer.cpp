@@ -17,6 +17,9 @@
 // logger headers
 #include "logger/logger.h"
 
+// kaleidoscope headers
+#include "kaleidoscope/kaleidoscope.h"
+
 // LLVM headers
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
@@ -41,30 +44,6 @@
 #include <vector>
 
 using namespace llvm;
-
-static std::map<char, int> BinopPrecedence;
-static int GetTokPrecedence() {
-  if (!isascii(CurTok)) {
-    return -1;
-  }
-
-  int TokPrec = BinopPrecedence[CurTok];
-  if (TokPrec <= 0) return -1;
-
-  return TokPrec;
-}
-
-// This is an object that owns LLVM core data structures
-static LLVMContext TheContext;
-
-// This is a helper object that makes easy to generate LLVM instructions
-static IRBuilder<> Builder(TheContext);
-
-// This is an LLVM construct that contains functions and global variables
-static std::unique_ptr<Module> TheModule;
-
-// This map keeps track of which values are defined in the current scope
-static std::map<std::string, Value *> NamedValues;
 
 static void HandleDefinition() {
   if (auto FnAST = ParseDefinition()) {

@@ -12,7 +12,7 @@ llvm::Function *FunctionAST::codegen() {
     return nullptr;
   }
 
-  llvm::BasicBlock *BB = BasicBlock::Create(TheContext, "entry", TheFunction);
+  llvm::BasicBlock *BB = llvm::BasicBlock::Create(TheContext, "entry", TheFunction);
   Builder.SetInsertPoint(BB);
   NamedValues.clear();
   for (auto &Arg : TheFunction->args()) {

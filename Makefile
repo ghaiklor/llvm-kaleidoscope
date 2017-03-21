@@ -4,11 +4,11 @@ OBJ = ${SOURCES:.cpp=.o}
 CC = llvm-g++
 
 CFLAGS = -g -O3 -stdlib=libc++ -std=c++11 -I llvm/include -I llvm/build/include
-LLVMFLAGS = `/usr/local/Cellar/llvm/3.9.1_1/bin/llvm-config --cxxflags --ldflags --system-libs --libs core`
+# LLVMFLAGS = `/usr/local/Cellar/llvm/3.9.1_1/bin/llvm-config --cxxflags --ldflags`
 
 .PHONY: compile
 
 compile: ${OBJ}
 
 %.o: %.cpp ${HEADERS}
-	${CC} ${CFLAGS} ${LLVMFLAGS} -c $< -o $@
+	${CC} ${CFLAGS} -c $< -o $@

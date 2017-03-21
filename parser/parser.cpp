@@ -1,5 +1,16 @@
 #include "parser.h"
 
+static int GetTokPrecedence() {
+  if (!isascii(CurTok)) {
+    return -1;
+  }
+
+  int TokPrec = BinopPrecedence[CurTok];
+  if (TokPrec <= 0) return -1;
+
+  return TokPrec;
+}
+
 // This routine expects to be called when the current token is a tok_number
 // It takes the current number value and creates a NumberExprAST node
 std::unique_ptr<ExprAST> ParseNumberExpr() {
