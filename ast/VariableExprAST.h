@@ -2,6 +2,7 @@
 #define __VARIABLE_EXPR_AST_H__
 
 #include "ast/ExprAST.h"
+#include "logger/logger.h"
 
 // Expression class for referencing a variable, like "a"
 class VariableExprAST : public ExprAST {
