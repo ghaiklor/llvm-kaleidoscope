@@ -2,8 +2,8 @@
 #define __BINARY_EXPR_AST_H__
 
 #include "llvm/IR/IRBuilder.h"
-#include "logger.h"
-#include "ExprAST.h"
+#include "logger/logger.h"
+#include "ast/ExprAST.h"
 
 // Expression class for a binary operator
 class BinaryExprAST : public ExprAST {

@@ -1,4 +1,4 @@
-#include "FunctionAST.h"
+#include "ast/FunctionAST.h"
 
 // Generates LLVM code for functions declarations
 llvm::Function *FunctionAST::codegen() {

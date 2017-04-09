@@ -1,4 +1,4 @@
-#include "PrototypeAST.h"
+#include "ast/PrototypeAST.h"
 
 // Generates LLVM code for externals calls
 llvm::Function *PrototypeAST::codegen() {

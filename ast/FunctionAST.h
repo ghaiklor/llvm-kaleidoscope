@@ -1,7 +1,7 @@
 #ifndef __FUNCTION_AST_H__
 #define __FUNCTION_AST_H__
 
-#include "PrototypeAST.h"
+#include "ast/PrototypeAST.h"
 
 // Represents a function definition itself
 class FunctionAST {

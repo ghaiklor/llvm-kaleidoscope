@@ -1,4 +1,4 @@
-#include "parser.h"
+#include "parser/parser.h"
 
 static int GetTokPrecedence() {
   if (!isascii(CurTok)) {

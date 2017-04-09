@@ -1,9 +1,9 @@
 #ifndef __PROTOTYPE_AST_H__
 #define __PROTOTYPE_AST_H__
 
-#include "ExprAST.h"
+#include "ast/ExprAST.h"
 #include "llvm/IR/IRBuilder.h"
-#include "kaleidoscope.h"
+#include "kaleidoscope/kaleidoscope.h"
 
 // Represents the "prototype" for a function,
 // which captures its name, and its argument names
