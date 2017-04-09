@@ -3,8 +3,8 @@
 
 #include "ExprAST.h"
 #include "llvm/IR/IRBuilder.h"
-#include "../logger/logger.h"
-#include "../kaleidoscope/kaleidoscope.h"
+#include "logger.h"
+#include "kaleidoscope.h"
 
 // Expression class for function calls
 class CallExprAST : public ExprAST {

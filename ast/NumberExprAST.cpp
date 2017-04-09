@@ -2,5 +2,5 @@
 
 // Generate LLVM code for numeric literals
 llvm::Value *NumberExprAST::codegen() {
-  return ConstantFP::get(TheContext, APFloat(Val));
+  return llvm::ConstantFP::get(TheContext, APFloat(Val));
 }

@@ -3,8 +3,7 @@
 
 #include "ExprAST.h"
 #include "llvm/IR/IRBuilder.h"
-#include "../logger/logger.h"
-#include "../kaleidoscope/kaleidoscope.h"
+#include "kaleidoscope.h"
 
 // Represents the "prototype" for a function,
 // which captures its name, and its argument names
