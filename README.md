@@ -23,4 +23,68 @@ If you dig in and use the code as a basis for future projects, fixing these defi
 
 ## How it works all together?
 
-TODO, when I'll know more :)
+### Lexer
+
+The first thing here is a lexer.
+Lexer is responsible for getting a stream of chars and translating it into a groups of tokens.
+
+> A lexer is a software program that performs lexical analysis. Lexical analysis is the process of separating a stream of characters into different words, which in computer science we call 'tokens'.
+
+Tokens identifiers are stored under `lexer/token.h` file and lexer implementation under `lexer/lexer.cpp` file.
+
+Tokens are just an `enum` structure, which consists of token identifier and a number assigned to this token.
+This way, we can identify tokens through lexical analysis.
+
+The actual reading of a stream is implemented in `lexer/lexer.cpp` file.
+Function `gettok` reads characters one-by-one from `stdin` and groups them in tokens.
+So, basically, `gettok` function reads characters and returns numbers (tokens).
+
+Further, we can use these tokens in parser (semantic analysis).
+
+### AST (Abstract Syntax Tree)
+
+Though, before diving into the parser, we need to implement AST nodes, that we can use during parsing.
+
+Basic block of each AST node is `ExprAST` node, which is stored under `ast/ExprAST.h` file.
+All other nodes are extends from `ExprAST` node.
+
+Each of AST nodes must implement one method - `codegen()`.
+`codegen()` method is responsible for generating LLVM IR, using LLVM IRBuilder API, that's all.
+
+As you can see in `ast` folder, we have implemented the following AST nodes with appropriate code generation into LLVM IR:
+
+- Binary Expressions;
+- Call Expressions;
+- Function Expressions;
+- Number Expressions;
+- Prototype Expressions;
+- Variable Expressions;
+
+Each of these nodes have a constructor where all mandatory values are initialized.
+Based on that information, `codegen()` can build LLVM IR, usine these values.
+
+The simplest one, i.e. is Number Expression.
+`codegen()` for number expression just calls appropriate method in LLVM IR Builder:
+
+```c++
+llvm::Value *NumberExprAST::codegen() {
+  return llvm::ConstantFP::get(TheContext, llvm::APFloat(Val));
+}
+```
+
+Now, we have two parts of a compiler which we can combine.
+
+### Parser
+
+Parser is where lexer and AST are combined together.
+The actual implementation of a parser stores into `parser/parser.cpp` file.
+
+Parser uses lexer for getting a stream of tokens, which are used for building an AST, using our AST implementation.
+
+So, in general, when parser sees a known token, i.e. number token, it tries to create a `NumberExprAST` node.
+
+When parsing is done, got the last character/token from the stream, we have an AST representation of our code.
+We can use it and generate LLVM IR from our AST using `codegen()` method in each AST node.
+
+This process is done in `main.cpp` file.
+`main.cpp` file is the place where all the parts are combined in one place.
