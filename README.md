@@ -1,5 +1,15 @@
 # Kaleidoscope: Implementing a Language with LLVM
 
+## How to build it
+On macOS (tested on 10.11.6).
+~~~
+# Install llvm (version 4.0, though @3.9 also works if you modify the llvm path in the Makefile)
+brew install llvm@4
+make
+./main
+# This should bring up a simple repl
+~~~
+
 ## Why?
 
 Self-education...
