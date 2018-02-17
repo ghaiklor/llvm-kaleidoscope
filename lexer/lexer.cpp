@@ -1,6 +1,10 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 
+int CurTok;
+std::string IdentifierStr;
+double NumVal;
+
 // The actual implementation of the lexer is a single function gettok()
 // It's called to return the next token from standard input
 // gettok works by calling getchar() function to read chars one at a time
