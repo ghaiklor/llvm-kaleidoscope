@@ -1,5 +1,7 @@
 #include "parser/parser.h"
 
+std::map<char, int> BinopPrecedence;
+
 static int GetTokPrecedence() {
   if (!isascii(CurTok)) {
     return -1;

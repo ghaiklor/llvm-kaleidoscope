@@ -12,7 +12,7 @@
 #include "lexer/lexer.h"
 #include "lexer/token.h"
 
-std::map<char, int> BinopPrecedence;
+extern std::map<char, int> BinopPrecedence;
 std::unique_ptr<ExprAST> ParseNumberExpr();
 std::unique_ptr<ExprAST> ParseParenExpr();
 std::unique_ptr<ExprAST> ParseIdentifierExpr();

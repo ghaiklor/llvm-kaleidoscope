@@ -5,7 +5,7 @@ OBJ = ${SOURCES:.cpp=.o}
 CC = llvm-g++
 # -stdlib=libc++ -std=c++11
 CFLAGS = -g -O3 -I llvm/include -I llvm/build/include -I ./
-LLVMFLAGS = `/usr/local/Cellar/llvm/3.9.1_1/bin/llvm-config --cxxflags --ldflags --system-libs --libs all`
+LLVMFLAGS = `/usr/local/Cellar/llvm@4/4.0.1/bin/llvm-config --cxxflags --ldflags --system-libs --libs all`
 
 .PHONY: main
 
