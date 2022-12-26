@@ -13,6 +13,8 @@
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 
+#include <map>
+
 // This is an object that owns LLVM core data structures
 extern llvm::LLVMContext TheContext;
 
