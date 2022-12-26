@@ -113,7 +113,7 @@ int main() {
   fprintf(stderr, "ready> ");
   getNextToken();
 
-  TheModule = llvm::make_unique<Module>("My awesome JIT", TheContext);
+  TheModule = std::make_unique<Module>("My awesome JIT", TheContext);
 
   MainLoop();
 
