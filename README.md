@@ -1,13 +1,13 @@
 # Kaleidoscope: Implementing a Language with LLVM
 
 ## How to build it
-On macOS (tested on 10.11.6).
+On MacOS (tested on Ventura 13.0).
 ~~~
-# Install llvm (version 4.0, though @3.9 also works if you modify the llvm path in the Makefile)
-brew install llvm@4
+# Install llvm (version 15.0)
+brew install llvm@15
 make
 ./main
-# This should bring up a simple repl
+# This should bring up a simple REPL.
 ~~~
 
 ## Why?
@@ -17,7 +17,7 @@ Self-education...
 I'm interested in LLVM and want to try simple things with it.
 That's why I've started official LLVM tutorial - [Kaleidoscope](http://llvm.org/docs/tutorial).
 
-## What's all about?
+## What's it all about?
 
 This tutorial runs through the implementation of a simple language, showing how fun and easy it can be.
 This tutorial will get you up and started as well as help to build a framework you can extend to other languages.
